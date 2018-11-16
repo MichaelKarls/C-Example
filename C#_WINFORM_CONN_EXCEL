@@ -1,0 +1,78 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Windows.Forms;
+using System.IO;
+using Oracle.DataAccess.Client;
+using System.Data;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using Excel = Microsoft.Office.Interop.Excel;//add reference about Excel
+using System.Transactions;
+
+namespace WindowsFormsApplication19
+{
+    public partial class Form1 : Form
+    {
+        Excel.Application excel = null;
+        Excel.Workbooks webs = null;
+        Excel.Workbook web = null;
+        Excel.Worksheet ws = null;//get the excel sheet data
+        Excel.Range range = null; //get data for a portion of the regien
+        
+        public Form1()
+        {
+            InitializeComponent();
+        }
+        private void button1_Click(object sender, EventArgs e)
+        {
+            
+            string connString = @"Data Source=(DESCRIPTION = (ADDRESS = (PROTOCOL = TCP)(HOST = 10.86.**.**)
+                (PORT = 1521))(CONNECT_DATA = (SERVER=dedicated)(SID=orcl)));User Id=orcl;Password=******;"; //connect oracle DataBase
+
+            OracleConnection conn = new OracleConnection(connString);
+            using (TransactionScope scope = new TransactionScope())  //use transaction to control 
+            {
+                try
+                {
+                    conn.Open();
+                    FolderBrowserDialog dialog = new FolderBrowserDialog();  //choose folders
+                    OpenFileDialog openDialog = new OpenFileDialog(); //choose excel files
+                    if (openDialog.ShowDialog() == DialogResult.OK)
+                    {
+                        excel = new Excel.Application();//if you choose an excel file ,an excel object will be created
+                        excel.Application.Workbooks.Open(openDialog.FileName.ToString(), null, null, null, null, null, null, null, null, null, null, null, null);
+                        this.webs = excel.Workbooks;
+                        web = webs[1];
+                        ws = (Excel.Worksheet)web.Worksheets[1];//get the first sheet's data 
+                        int rowCount = ws.UsedRange.Rows.Count;
+                        int colCount = ws.UsedRange.Columns.Count;
+                        for (int i = 0; i < rowCount; i++)
+                        {
+                            string connCmd = string.Format
+                                ("INSERT INTO IMS_IC_PROGRAM_CONFIG VALUES(IMS_IC_PROGRAM_CONFIG_SEQ.Nextval,1,-1,'','{0}','{1}','{2}','{3}','','','','','')",
+                                ((Excel.Range)ws.Cells[i + 2, 6]).Text.ToString(), ((Excel.Range)ws.Cells[i + 2, 7]).Text.ToString(),
+                                ((Excel.Range)ws.Cells[i + 2, 8]).Text.ToString(), ((Excel.Range)ws.Cells[i + 2, 9]).Text.ToString());
+                            OracleCommand cmd = new OracleCommand(connCmd, conn);
+                            cmd.ExecuteNonQuery();
+                        }
+                    }                  
+                }
+                catch (Exception ex)
+                {
+                    this.textBox1.Text += ex.ToString();
+                    scope.Dispose();  //dispose memoroy,this is very important
+                }
+                finally
+                {
+                    scope.Complete();
+                    conn.Close();  //close the connection
+                }
+            }
+        }
+    }
+}
